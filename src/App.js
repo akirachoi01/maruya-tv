@@ -1324,22 +1324,14 @@ const channelList = [
 
 // Main App component
 const App = () => {
-  // State to hold the currently selected channel's URL
   const [source, setSource] = useState('');
-  // State to track if player libraries are ready
   const [playersReady, setPlayersReady] = useState(false);
-  
-  // Ref to directly access the video DOM element
   const videoRef = useRef(null);
-  
-  // Refs to hold the player instances
   const hlsPlayerRef = useRef(null);
   const dashPlayerRef = useRef(null);
-  
-  // State for search term
   const [searchTerm, setSearchTerm] = useState('');
 
-  // useEffect hook to dynamically load player libraries
+  // Dynamically load player libraries
   useEffect(() => {
     let hlsScript = document.createElement('script');
     hlsScript.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
@@ -1353,8 +1345,9 @@ const App = () => {
     let dashLoaded = false;
 
     const onScriptLoad = () => {
-      hlsLoaded = !!window.Hls;
-      dashLoaded = !!window.dashjs;
+      // Check if both libraries are loaded and set the state
+      if (window.Hls) { hlsLoaded = true; }
+      if (window.dashjs) { dashLoaded = true; }
       if (hlsLoaded && dashLoaded) {
         setPlayersReady(true);
       }
@@ -1372,44 +1365,45 @@ const App = () => {
     };
   }, []);
 
-  // useEffect hook to handle video playback logic once libraries are ready
+  // Handle video playback logic once libraries are ready
   useEffect(() => {
     const video = videoRef.current;
     
-    if (video && playersReady) {
-      // Cleanup existing players
-      if (hlsPlayerRef.current) {
-        hlsPlayerRef.current.destroy();
-        hlsPlayerRef.current = null;
-      }
-      if (dashPlayerRef.current) {
-        dashPlayerRef.current.reset();
-        dashPlayerRef.current = null;
-      }
+    if (!video || !playersReady) {
+      return;
+    }
+    
+    // Cleanup existing players
+    if (hlsPlayerRef.current) {
+      hlsPlayerRef.current.destroy();
+      hlsPlayerRef.current = null;
+    }
+    if (dashPlayerRef.current) {
+      dashPlayerRef.current.reset();
+      dashPlayerRef.current = null;
+    }
 
-      if (source) {
-        if (source.includes('.m3u8')) {
-          if (window.Hls.isSupported()) {
-            const hls = new window.Hls();
-            hlsPlayerRef.current = hls;
-            hls.loadSource(source);
-            hls.attachMedia(video);
-            hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
-              video.play().catch(error => console.error('Autoplay prevented:', error));
-            });
-          } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = source;
-            video.addEventListener('loadedmetadata', () => video.play());
-          }
-        } else if (source.includes('.mpd')) {
-          const dashPlayer = window.dashjs.MediaPlayer().create();
-          dashPlayerRef.current = dashPlayer;
-          dashPlayer.initialize(video, source, true);
+    if (source) {
+      if (source.includes('.m3u8')) {
+        if (window.Hls.isSupported()) {
+          const hls = new window.Hls();
+          hlsPlayerRef.current = hls;
+          hls.loadSource(source);
+          hls.attachMedia(video);
+          hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+            video.play().catch(error => console.error('Autoplay prevented:', error));
+          });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = source;
+          video.addEventListener('loadedmetadata', () => video.play());
         }
+      } else if (source.includes('.mpd')) {
+        const dashPlayer = window.dashjs.MediaPlayer().create();
+        dashPlayerRef.current = dashPlayer;
+        dashPlayer.initialize(video, source, true);
       }
     }
     
-    // Cleanup on component unmount
     return () => {
       if (hlsPlayerRef.current) {
         hlsPlayerRef.current.destroy();
@@ -1421,7 +1415,6 @@ const App = () => {
     
   }, [source, playersReady]);
 
-  // Handle a channel click from the list
   const handleChannelClick = (url) => {
     setSource(url);
   };
@@ -1432,35 +1425,15 @@ const App = () => {
     setOpenChannel(openChannel === channelName ? null : channelName);
   };
 
-  // Filter channels based on search term
   const filteredChannels = channelList.filter(channel => 
     channel.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col md:flex-row p-4 font-sans gap-4">
       
-      {/* Video Player Section */}
-      <div className="flex-grow flex flex-col justify-center items-center p-6 bg-gray-800 rounded-xl shadow-2xl relative md:sticky md:top-4 md:h-screen">
-        {source ? (
-          <div className="relative w-full aspect-video bg-gray-900 rounded-lg overflow-hidden shadow-xl">
-            <video
-              ref={videoRef}
-              className="w-full h-full"
-              controls
-              autoPlay
-            ></video>
-          </div>
-        ) : (
-          <div className="w-full aspect-video flex items-center justify-center bg-gray-900 rounded-lg shadow-xl">
-            <p className="text-xl text-gray-400 text-center">Pumili ng channel sa kaliwa para magsimula.</p>
-          </div>
-        )}
-      </div>
-
       {/* Channel List Section */}
-      <div className="md:w-1/4 w-full p-4 bg-gray-800 rounded-xl shadow-2xl flex-shrink-0 h-96 md:h-auto overflow-y-auto">
+      <div className="md:w-1/4 w-full p-4 bg-gray-800 rounded-xl shadow-2xl flex-shrink-0 md:max-h-screen overflow-y-auto">
         <h2 className="text-2xl font-bold text-indigo-400 mb-4 sticky top-0 bg-gray-800 pb-2">
           Channels
         </h2>
@@ -1513,7 +1486,27 @@ const App = () => {
         )}
       </div>
 
-      {/* Tailwind CSS Script for styling */}
+      {/* Video Player Section */}
+      <div className="flex-grow flex flex-col justify-center items-center p-6 bg-gray-800 rounded-xl shadow-2xl">
+        {source ? (
+          <div className="relative w-full aspect-video bg-gray-900 rounded-lg overflow-hidden shadow-xl">
+            <video
+              ref={videoRef}
+              className="w-full h-full"
+              controls
+              autoPlay
+            ></video>
+          </div>
+        ) : (
+          <div className="w-full aspect-video flex items-center justify-center bg-gray-900 rounded-lg shadow-xl">
+            <p className="text-xl text-gray-400 text-center">Pumili ng channel sa kaliwa para magsimula.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Script tags for HLS.js and Dash.js to fix reference errors */}
+      <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+      <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
       <script src="https://cdn.tailwindcss.com"></script>
     </div>
   );
